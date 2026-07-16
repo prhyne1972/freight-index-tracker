@@ -1,0 +1,37 @@
+name: Monthly Freight Index Update
+
+on:
+  schedule:
+    - cron: '0 12 16 * *'   # 16th of each month at 12:00 UTC
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write         # needed to commit index.html back to the repo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run updater
+        run: python update_index.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --staged --quiet && echo "No changes to commit" || (
+            git commit -m "Monthly data refresh: $(date +'%Y-%m')"
+            git push
+          )
