@@ -71,6 +71,15 @@
     }
     .tag-live   { background: #E8F5E9; color: #2E7D32; }
     .tag-cached { background: #FFF8E1; color: #E65100; }
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 13px; border-radius: 8px; white-space: nowrap;
+      font-size: 11.5px; font-weight: 600; cursor: pointer;
+      background: white; border: 1.5px solid #e0e0e0; color: #555;
+      transition: all 0.12s; flex-shrink: 0;
+    }
+    .download-btn:hover { border-color: #bbb; background: #f8f8f8; }
+    .instructions { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; }
   </style>
 </head>
 <body>
@@ -85,16 +94,18 @@ const EMBEDDED = {"updatedAt":"2026-07-16T12:00:00.000Z","dates":["2021-07","202
 
 <div class="header">
   <div>
-    <h1>Transportation &amp; Price Indices — 60-Month Rolling View</h1>
+    <h1>Interactive Freight &amp; Price Index Tracker — 60-Month Rolling View</h1>
     <div class="sub">
       Rebased to 1.0000 at start of window &nbsp;·&nbsp;
       Source: U.S. Bureau of Labor Statistics &nbsp;·&nbsp;
       Updated monthly via scheduled task
     </div>
   </div>
+  <button class="download-btn" onclick="downloadChart()">⬇ Save Current View as JPG</button>
 </div>
 
 <div class="toggles" id="toggles"></div>
+<div class="instructions">Click any index to show or hide it on the chart.</div>
 
 <div class="chart-wrap" id="chartWrap">
   <canvas id="priceChart"></canvas>
@@ -117,14 +128,14 @@ const EMBEDDED = {"updatedAt":"2026-07-16T12:00:00.000Z","dates":["2021-07","202
 <script>
 /* ── Series config ────────────────────────────────────────────────────── */
 const SERIES = [
-  { id: 'WPUFD49207',         label: 'PPI — Final Demand',        short: 'PPI',        color: '#1565C0' },
-  { id: 'CUUR000SA0',         label: 'CPI — All Urban Consumers', short: 'CPI',        color: '#546E7A' },
-  { id: 'PCU49211492110P',    label: 'Parcel',                    short: 'Parcel',     color: '#E65100' },
-  { id: 'PCU484122484122',    label: 'LTL Trucking',              short: 'LTL',        color: '#2E7D32' },
-  { id: 'PCU484121484121',    label: 'Truckload',                 short: 'Truckload',  color: '#C62828' },
-  { id: 'PCU483111PCU483111', label: 'Ocean Freight',             short: 'Ocean',      color: '#006064' },
-  { id: 'PCU481112481112',    label: "Int'l Scheduled Air",       short: "Int'l Air",  color: '#4527A0' },
-  { id: 'PCU482111482111',    label: 'Intermodal Rail',           short: 'Intermodal', color: '#5D4037' },
+  { id: 'WPUFD49207',         label: 'Producer Price Index',  short: 'Producer Price Index',  color: '#1565C0', thick: true  },
+  { id: 'CUUR000SA0',         label: 'Consumer Price Index',  short: 'Consumer Price Index',  color: '#546E7A', thick: true  },
+  { id: 'PCU49211492110P',    label: 'Parcel',                short: 'Parcel',                color: '#E65100', thick: false },
+  { id: 'PCU484122484122',    label: 'LTL Trucking',          short: 'LTL',                   color: '#2E7D32', thick: false },
+  { id: 'PCU484121484121',    label: 'Truckload',             short: 'Truckload',             color: '#C62828', thick: false },
+  { id: 'PCU483111PCU483111', label: 'Ocean Freight',         short: 'Ocean',                 color: '#006064', thick: false },
+  { id: 'PCU481112481112',    label: "Int'l Scheduled Air",   short: "Int'l Air",             color: '#4527A0', thick: false },
+  { id: 'PCU482111482111',    label: 'Intermodal Rail',       short: 'Intermodal',            color: '#5D4037', thick: false },
 ];
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -134,7 +145,8 @@ function fmt(key) {
 }
 
 let chart   = null;
-let visible = SERIES.map(() => true);
+// Default: Producer Price Index, Parcel, LTL, Truckload visible; rest hidden
+let visible = [true, false, true, true, true, false, false, false];
 
 /* ── Toggles ────────────────────────────────────────────────────── */
 function renderToggles() {
@@ -170,7 +182,7 @@ function renderChart(processed) {
         data:                      processed.series[s.id] ?? processed.dates.map(() => null),
         borderColor:               s.color,
         backgroundColor:           s.color + '12',
-        borderWidth:               2.2,
+        borderWidth:               s.thick ? 5.5 : 2.2,
         pointRadius:               0,
         pointHoverRadius:          5,
         pointHoverBackgroundColor: s.color,
@@ -210,6 +222,16 @@ function renderChart(processed) {
       },
     },
   });
+}
+
+/* ── Download ─────────────────────────────────────────────────────────────── */
+function downloadChart() {
+  if (!chart) return;
+  const url = chart.toBase64Image('image/jpeg', 0.95);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'freight-price-index.jpg';
+  a.click();
 }
 
 /* ── Init with embedded data ────────────────────────────────────────────────── */
