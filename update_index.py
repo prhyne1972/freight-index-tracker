@@ -40,14 +40,14 @@ def build_window() -> list[str]:
         ey, em = today.year - 1, 12
     else:
         ey, em = today.year, today.month - 1
-    # Walk back 59 more months to get 60 total
-    sy, sm = ey, em - 59
+    # Walk back 35 more months to get 36 total
+    sy, sm = ey, em - 35
     while sm <= 0:
         sm += 12
         sy -= 1
     months = []
     y, m = sy, sm
-    for _ in range(60):
+    for _ in range(36):
         months.append(f'{y:04d}-{m:02d}')
         m += 1
         if m > 12:
