@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Monthly updater for freight-index-tracker/index.html
-Fetches BLS data via FRED mirrors, rebases to a 60-month rolling window,
-and patches the EMBEDDED constant in index.html in-place.
+Fetches BLS data via FRED mirrors, rebases to a 36-month rolling window,
+and writes a COMPLETE self-contained index.html from the template embedded
+in this script.  Never reads or patches the existing index.html — so a
+corrupted or missing file in the repo cannot propagate.
 
 Run:  python update_index.py
 Deps: pip install requests
 """
 
-import re
 import json
 import csv
 import io
@@ -32,15 +33,13 @@ FRED_CSV = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id={}'
 HEADERS  = {'User-Agent': 'freight-index-tracker-updater/1.0'}
 
 
-def build_window() -> list[str]:
-    """Return 60 YYYY-MM strings ending at last complete month."""
+def build_window():
+    """Return 36 YYYY-MM strings ending at last complete month."""
     today = date.today()
-    # Last complete month
     if today.month == 1:
         ey, em = today.year - 1, 12
     else:
         ey, em = today.year, today.month - 1
-    # Walk back 35 more months to get 36 total
     sy, sm = ey, em - 35
     while sm <= 0:
         sm += 12
@@ -56,7 +55,7 @@ def build_window() -> list[str]:
     return months
 
 
-def fetch_fred(fred_id: str) -> dict[str, float]:
+def fetch_fred(fred_id):
     """Return {YYYY-MM: float} for the given FRED series (drops missing '.')."""
     url = FRED_CSV.format(fred_id)
     print(f'  fetching {url}')
@@ -65,15 +64,15 @@ def fetch_fred(fred_id: str) -> dict[str, float]:
     data = {}
     reader = csv.DictReader(io.StringIO(r.text))
     for row in reader:
-        ym = row['DATE'][:7]        # "2024-05-01" → "2024-05"
+        ym = row['DATE'][:7]
         v  = row['VALUE']
         if v and v != '.':
             data[ym] = float(v)
     return data
 
 
-def rebase(raw: dict[str, float], window: list[str]) -> list[float | None]:
-    """Rebase series to first available value in window; null for missing months."""
+def rebase(raw, window):
+    """Rebase series to first available value in window; None for missing months."""
     base = None
     for ym in window:
         if ym in raw:
@@ -87,11 +86,247 @@ def rebase(raw: dict[str, float], window: list[str]) -> list[float | None]:
     ]
 
 
+# ── Full HTML template ────────────────────────────────────────────────────────
+# EMBEDDED_PLACEHOLDER is replaced with fresh JSON on every run.
+# This script generates index.html entirely from scratch — it never reads or
+# patches whatever is already in the repo.
+
+HTML_TEMPLATE = r"""<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Freight Price Index Tracker",
+  "schemaVersion": 1,
+  "description": "Interactive 36-month rolling chart comparing CPI, PPI Final Demand, Parcel, LTL, Truckload, Ocean, International Air, and Intermodal indices from the BLS. Each series is rebased to 1.000 at the start of the window. Toggle any series on/off. Data auto-rolls forward each month."
+}
+</script>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transportation &amp; Price Index Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"
+          integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi"
+          crossorigin="anonymous"></script>
+  <style>
+    :root { color-scheme: light; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      padding: 16px 20px 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .header h1 { font-size: 15px; font-weight: 700; line-height: 1.35; }
+    .header .sub { font-size: 11px; color: #888; margin-top: 3px; }
+    .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px 5px 8px; border-radius: 20px;
+      font-size: 11.5px; font-weight: 600; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.12s; user-select: none;
+    }
+    .chip.on  { color: white; }
+    .chip.off { color: #aaa !important; background: white !important; border-color: #e0e0e0 !important; }
+    .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .chart-wrap {
+      background: white; border-radius: 12px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+      padding: 16px; position: relative; height: 400px;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0.95);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; border-radius: 12px; z-index: 20; text-align: center; padding: 20px;
+    }
+    .overlay-title { font-size: 14px; font-weight: 600; color: #333; }
+    .overlay-body  { font-size: 12px; color: #777; max-width: 360px; line-height: 1.6; }
+    .status {
+      display: flex; justify-content: space-between;
+      font-size: 10.5px; color: #bbb; margin-top: 9px; padding: 0 2px;
+    }
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 13px; border-radius: 8px; white-space: nowrap;
+      font-size: 11.5px; font-weight: 600; cursor: pointer;
+      background: white; border: 1.5px solid #e0e0e0; color: #555;
+      transition: all 0.12s; flex-shrink: 0;
+    }
+    .download-btn:hover { border-color: #bbb; background: #f8f8f8; }
+    .instructions { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<!-- DATA INJECTED BY update_index.py — do not edit manually -->
+<script id="embeddedDataBlock">
+const EMBEDDED = EMBEDDED_PLACEHOLDER;
+</script>
+
+<div class="header">
+  <div>
+    <h1>Interactive Freight &amp; Price Index Tracker — 36-Month Rolling View</h1>
+    <div class="sub">
+      Rebased to 1.0000 at start of window &nbsp;·&nbsp;
+      Source: U.S. Bureau of Labor Statistics &nbsp;·&nbsp;
+      Updated monthly via scheduled task
+    </div>
+  </div>
+  <button class="download-btn" onclick="downloadChart()">⬇ Save Current View as JPG</button>
+</div>
+
+<div class="toggles" id="toggles"></div>
+<div class="instructions">Click any index to show or hide it on the chart.</div>
+
+<div class="chart-wrap" id="chartWrap">
+  <canvas id="priceChart"></canvas>
+  <div class="overlay" id="overlay">
+    <div class="overlay-title" id="overlayTitle">Data not yet loaded</div>
+    <div class="overlay-body" id="overlayBody">
+      This chart is populated by a monthly scheduled task.<br>
+      The task will run automatically each month and embed fresh BLS data here.
+    </div>
+  </div>
+</div>
+
+<div class="status">
+  <span id="statusRange">—</span>
+  <span id="statusFetch">—</span>
+</div>
+
+<script>
+const SERIES = [
+  { id: 'WPUFD49207',         label: 'Producer Price Index',  short: 'Producer Price Index',  color: '#1565C0', thick: true  },
+  { id: 'CUUR000SA0',         label: 'Consumer Price Index',  short: 'Consumer Price Index',  color: '#546E7A', thick: true  },
+  { id: 'PCU49211492110P',    label: 'Parcel',                short: 'Parcel',                color: '#E65100', thick: false },
+  { id: 'PCU484122484122',    label: 'LTL Trucking',          short: 'LTL',                   color: '#2E7D32', thick: false },
+  { id: 'PCU484121484121',    label: 'Truckload',             short: 'Truckload',             color: '#C62828', thick: false },
+  { id: 'PCU483111PCU483111', label: 'Ocean Freight',         short: 'Ocean',                 color: '#006064', thick: false },
+  { id: 'PCU481112481112',    label: "Int'l Scheduled Air",   short: "Int'l Air",             color: '#4527A0', thick: false },
+  { id: 'PCU482111482111',    label: 'Intermodal Rail',       short: 'Intermodal',            color: '#5D4037', thick: false },
+];
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmt(key) {
+  const [y, m] = key.split('-');
+  return `${MONTHS[+m - 1]} '${y.slice(2)}`;
+}
+
+let chart   = null;
+let visible = [true, false, true, true, true, false, false, false];
+
+function renderToggles() {
+  const el = document.getElementById('toggles');
+  el.innerHTML = '';
+  SERIES.forEach((s, i) => {
+    const on = visible[i];
+    const c  = document.createElement('div');
+    c.className = `chip ${on ? 'on' : 'off'}`;
+    if (on) { c.style.backgroundColor = s.color; c.style.borderColor = s.color; }
+    c.innerHTML = `<span class="chip-dot" style="background:${on ? 'rgba(255,255,255,0.8)' : s.color}"></span>${s.short}`;
+    c.title = s.label;
+    c.onclick = () => {
+      visible[i] = !visible[i];
+      if (chart) { chart.data.datasets[i].hidden = !visible[i]; chart.update('none'); }
+      renderToggles();
+    };
+    el.appendChild(c);
+  });
+}
+
+function renderChart(processed) {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if (chart) { chart.destroy(); chart = null; }
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels:   processed.dates.map(fmt),
+      datasets: SERIES.map((s, i) => ({
+        label:                     s.label,
+        data:                      processed.series[s.id] ?? processed.dates.map(() => null),
+        borderColor:               s.color,
+        backgroundColor:           s.color + '12',
+        borderWidth:               s.thick ? 5.5 : 2.2,
+        pointRadius:               0,
+        pointHoverRadius:          5,
+        pointHoverBackgroundColor: s.color,
+        pointHoverBorderColor:     'white',
+        pointHoverBorderWidth:     2,
+        tension:                   0.15,
+        hidden:                    !visible[i],
+        spanGaps:                  true,
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.97)',
+          borderColor: '#e0e0e0', borderWidth: 1,
+          titleColor: '#222', bodyColor: '#444', padding: 11,
+          callbacks: {
+            label: ctx => ctx.parsed.y != null
+              ? `  ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`
+              : null,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: '#f2f2f2' },
+          ticks: { autoSkip: false, maxRotation: 90, minRotation: 90, font: { size: 9 }, color: '#999' },
+        },
+        y: {
+          grid: { color: '#f2f2f2' },
+          ticks: { callback: v => v.toFixed(3), font: { size: 10.5 }, color: '#999' },
+          title: { display: true, text: 'Index (rebased to 1.000 at start of window)', font: { size: 11 }, color: '#888' },
+        },
+      },
+    },
+  });
+}
+
+function downloadChart() {
+  if (!chart) return;
+  const url = chart.toBase64Image('image/jpeg', 0.95);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'freight-price-index.jpg';
+  a.click();
+}
+
+function main() {
+  renderToggles();
+  if (EMBEDDED && EMBEDDED.dates && EMBEDDED.series) {
+    document.getElementById('overlay').style.display = 'none';
+    renderChart(EMBEDDED);
+    document.getElementById('statusRange').textContent =
+      `${EMBEDDED.dates[0]} → ${EMBEDDED.dates[EMBEDDED.dates.length - 1]}`;
+    document.getElementById('statusFetch').textContent =
+      `Updated ${EMBEDDED.updatedAt.slice(0, 10)}`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', main);
+</script>
+</body>
+</html>"""
+
+
 def main():
     window = build_window()
     print(f'Window: {window[0]} → {window[-1]}  ({len(window)} months)')
 
-    series_out: dict[str, list] = {}
+    series_out = {}
     for bls_id, fred_id in SERIES.items():
         print(f'\n[{bls_id}]')
         try:
@@ -113,26 +348,13 @@ def main():
         'series':    series_out,
     }
 
-    js      = json.dumps(embedded, separators=(',', ':'))
-    new_line = f'const EMBEDDED = {js};'
+    js   = json.dumps(embedded, separators=(',', ':'))
+    html = HTML_TEMPLATE.replace('EMBEDDED_PLACEHOLDER', js)
 
-    with open('index.html', 'r', encoding='utf-8') as f:
-        html = f.read()
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(html)
 
-    html_new = re.sub(
-        r'const EMBEDDED = .*?;',
-        new_line,
-        html,
-        count=1,
-        flags=re.DOTALL,
-    )
-
-    if html_new == html:
-        print('\nWARNING: no replacement made — check that index.html contains "const EMBEDDED = ...;"')
-    else:
-        with open('index.html', 'w', encoding='utf-8') as f:
-            f.write(html_new)
-        print(f'\nindex.html updated  ({len(js)} chars of data embedded)')
+    print(f'\nindex.html written from template  ({len(js)} chars of data, {len(html)} chars total)')
 
 
 if __name__ == '__main__':
