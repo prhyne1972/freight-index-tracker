@@ -3,7 +3,7 @@
 {
   "name": "Freight Price Index Tracker",
   "schemaVersion": 1,
-  "description": "Interactive 36-month rolling chart comparing CPI, PPI Final Demand, Parcel, LTL, Truckload, Ocean, International Air, and Intermodal indices from the BLS. Each series is rebased to 1.000 at the start of the window. Toggle any series on/off. Data auto-rolls forward each month."
+  "description": "Interactive 36-month rolling chart comparing CPI, PPI Final Demand, Parcel, LTL, Truckload, Ocean, International Air, and Intermodal indices from the BLS. Each series is rebased to 1.000 at the start of the window. Toggle any series on/off. Data updated monthly."
 }
 </script>
 <html lang="en">
@@ -11,28 +11,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Transportation &amp; Price Index Tracker</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"
-          integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi"
-          crossorigin="anonymous"></script>
   <style>
     :root { color-scheme: light; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f6fa;
-      color: #1a1a2e;
+      background: #f5f6fa; color: #1a1a2e;
       padding: 16px 20px 20px;
     }
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 14px;
-      gap: 12px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 14px; gap: 12px;
     }
     .header h1 { font-size: 15px; font-weight: 700; line-height: 1.35; }
     .header .sub { font-size: 11px; color: #888; margin-top: 3px; }
-    .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
     .chip {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 5px 11px 5px 8px; border-radius: 20px;
@@ -42,19 +35,22 @@
     .chip.on  { color: white; }
     .chip.off { color: #aaa !important; background: white !important; border-color: #e0e0e0 !important; }
     .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .instructions { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; }
     .chart-wrap {
       background: white; border-radius: 12px;
       box-shadow: 0 1px 5px rgba(0,0,0,0.07);
-      padding: 16px; position: relative; height: 400px;
+      padding: 8px; position: relative;
     }
-    .overlay {
-      position: absolute; inset: 0;
-      background: rgba(255,255,255,0.95);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 14px; border-radius: 12px; z-index: 20; text-align: center; padding: 20px;
+    canvas { display: block; width: 100%; cursor: crosshair; }
+    .tooltip {
+      position: absolute; background: rgba(255,255,255,0.97);
+      border: 1px solid #e0e0e0; border-radius: 8px;
+      padding: 10px 13px; font-size: 11.5px; pointer-events: none;
+      display: none; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      max-width: 220px;
     }
-    .overlay-title { font-size: 14px; font-weight: 600; color: #333; }
-    .overlay-body  { font-size: 12px; color: #777; max-width: 360px; line-height: 1.6; }
+    .tooltip .tt-title { font-weight: 700; color: #333; margin-bottom: 6px; }
+    .tooltip .tt-row { color: #555; line-height: 1.8; }
     .status {
       display: flex; justify-content: space-between;
       font-size: 10.5px; color: #bbb; margin-top: 9px; padding: 0 2px;
@@ -67,14 +63,12 @@
       transition: all 0.12s; flex-shrink: 0;
     }
     .download-btn:hover { border-color: #bbb; background: #f8f8f8; }
-    .instructions { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; }
   </style>
 </head>
 <body>
 
-<!-- DATA INJECTED BY update_index.py — do not edit manually -->
 <script id="embeddedDataBlock">
-const EMBEDDED = {"updatedAt":"2026-10-18T12:00:00.000Z","dates":["2023-10","2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"],"series":{"WPUFD49207":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"CUUR000SA0":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU49211492110P":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU484122484122":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU484121484121":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU483111PCU483111":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU481112481112":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"PCU482111482111":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}};
+const EMBEDDED = {"updatedAt":"2026-11-13T00:00:00Z","dates":["2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"],"series":{"WPUFD49207":[1.0,0.9904545,0.999228,1.0157732,1.0237508,1.0294836,1.0234657,1.0236558,1.0286562,1.0281652,1.0189207,1.0163749,1.0200332,1.0178002,1.0297291,1.0375088,1.0319422,1.0324807,1.0355411,1.0430199,1.0483766,1.0480717,1.0505858,1.0414996,1.0482776,1.0397734,1.0411749,1.0546834,1.0782363,1.0992157,1.1260902,1.1102577,1.1091967,1.1155708,1.1366849,1.1373896],"CUUR000SA0":[1.0,0.9990067,1.0044488,1.010666,1.0171991,1.0211594,1.0228561,1.0232014,1.0243901,1.0252238,1.0268685,1.0280507,1.0274938,1.0278586,1.0345871,1.0391824,1.0415175,1.0447613,1.0469433,1.0505128,1.0520988,1.0551211,1.0578047,null,1.0555966,1.0553752,1.0592768,1.0642695,1.0754337,1.0845755,1.0914246,1.0876109,1.0875001,1.0909588,1.0973421,1.0992018],"PCU49211492110P":[1.0,0.9978917,1.055263,1.0584019,1.0579602,1.0566038,1.058759,1.0565912,1.0588248,1.0556859,1.0570455,1.0565411,1.0705284,1.0858909,1.1316588,1.1234858,1.1216375,1.1199647,1.1185205,1.1282599,1.1341117,1.1339551,1.1314458,1.1308443,1.1567231,1.172662,1.2248488,1.2073091,1.2153694,1.2568456,1.2593392,1.241906,1.2313584,1.2493241,1.2600879,1.2682986],"PCU484122484122":[1.0,0.9804318,1.0055791,1.013819,1.0190244,1.0250808,1.0161477,1.0034495,1.027202,1.0118762,1.0089041,1.010083,1.0103486,1.0104649,1.0683891,1.0760229,1.0751512,1.0756493,1.071519,1.0834866,1.1017804,1.1142793,1.1083433,1.1056077,1.1133661,1.1095595,1.1234823,1.132926,1.1529259,1.290966,1.2953495,1.2783716,1.2191523,1.2737141,1.3278027,1.3516465],"PCU484121484121":[1.0,0.9492858,0.9557653,0.9525336,0.9231649,0.9239074,0.9699208,0.9759196,1.0152719,0.9439975,0.9196447,0.8863231,0.8565377,0.9172676,0.9703321,0.9582332,0.8857943,0.9352745,0.9535592,0.8994797,0.9663472,0.9739538,0.9938677,0.9876767,1.0101599,0.9672607,0.968767,0.9791727,1.0219331,1.0734592,1.0836458,1.058011,1.0820593,1.1208401,1.168376,1.2339028],"PCU483111PCU483111":[1.0,1.0308236,1.0605038,1.0352579,1.0056584,1.0113194,1.0462593,1.0970438,1.1096478,1.092029,1.0455779,1.0334837,1.0008783,0.9948716,1.0813103,1.1044361,1.0495024,1.0356289,1.0083312,1.0215611,0.9908663,0.9914291,0.9866918,1.0617657,1.01641,1.0481522,1.1237914,1.1150539,1.1391388,1.166212,1.1989688,1.2728388,1.3153805,1.3736229,1.4472658,1.4460746],"PCU481112481112":[1.0,1.0084711,0.9417666,0.9059241,0.9199149,0.9326712,0.925619,0.9240866,0.9746861,0.9313941,0.9437957,1.0338985,1.030635,1.044044,0.9660163,0.939028,0.9589926,0.9716637,0.9475133,0.9540263,0.9650089,0.9354097,0.96105,0.9371266,0.9735367,1.0067684,0.950933,0.9665129,0.9510181,0.994679,1.1012416,1.0855906,1.0746364,1.092359,1.0308336,1.066066],"PCU482111482111":[1.0,1.0010604,1.0013581,0.9514955,0.9489282,0.9515188,0.9591509,0.9560953,0.9654436,0.9606625,0.9624996,0.9449982,0.9503421,0.9484771,0.9533791,0.9523699,0.9505467,0.9514257,0.9489747,0.9524582,0.9542675,0.9568255,0.9603881,0.9559092,0.9576812,0.9670249,0.9545,0.953128,0.9567976,0.9748478,0.9892517,0.9889122,0.9823497,0.9844752,0.9853356,0.9862426]}};
 </script>
 
 <div class="header">
@@ -94,12 +88,9 @@ const EMBEDDED = {"updatedAt":"2026-10-18T12:00:00.000Z","dates":["2023-10","202
 
 <div class="chart-wrap" id="chartWrap">
   <canvas id="priceChart"></canvas>
-  <div class="overlay" id="overlay">
-    <div class="overlay-title" id="overlayTitle">Data not yet loaded</div>
-    <div class="overlay-body" id="overlayBody">
-      This chart is populated by a monthly scheduled task.<br>
-      The task will run automatically each month and embed fresh BLS data here.
-    </div>
+  <div class="tooltip" id="tooltip">
+    <div class="tt-title" id="tt-title"></div>
+    <div id="tt-body"></div>
   </div>
 </div>
 
@@ -110,117 +101,259 @@ const EMBEDDED = {"updatedAt":"2026-10-18T12:00:00.000Z","dates":["2023-10","202
 
 <script>
 const SERIES = [
-  { id: 'WPUFD49207',         label: 'Producer Price Index',  short: 'Producer Price Index',  color: '#1565C0', thick: true  },
-  { id: 'CUUR000SA0',         label: 'Consumer Price Index',  short: 'Consumer Price Index',  color: '#546E7A', thick: true  },
-  { id: 'PCU49211492110P',    label: 'Parcel',                short: 'Parcel',                color: '#E65100', thick: false },
-  { id: 'PCU484122484122',    label: 'LTL Trucking',          short: 'LTL',                   color: '#2E7D32', thick: false },
-  { id: 'PCU484121484121',    label: 'Truckload',             short: 'Truckload',             color: '#C62828', thick: false },
-  { id: 'PCU483111PCU483111', label: 'Ocean Freight',         short: 'Ocean',                 color: '#006064', thick: false },
-  { id: 'PCU481112481112',    label: "Int'l Scheduled Air",   short: "Int'l Air",             color: '#4527A0', thick: false },
-  { id: 'PCU482111482111',    label: 'Intermodal Rail',       short: 'Intermodal',            color: '#5D4037', thick: false },
+  { id: 'WPUFD49207',         label: 'Producer Price Index', short: 'Producer Price Index', color: '#1565C0', thick: true,  on: true  },
+  { id: 'CUUR000SA0',         label: 'Consumer Price Index', short: 'Consumer Price Index', color: '#546E7A', thick: true,  on: false },
+  { id: 'PCU49211492110P',    label: 'Parcel',               short: 'Parcel',               color: '#E65100', thick: false, on: true  },
+  { id: 'PCU484122484122',    label: 'LTL Trucking',         short: 'LTL',                  color: '#2E7D32', thick: false, on: true  },
+  { id: 'PCU484121484121',    label: 'Truckload',            short: 'Truckload',            color: '#C62828', thick: false, on: true  },
+  { id: 'PCU483111PCU483111', label: 'Ocean Freight',        short: 'Ocean',                color: '#006064', thick: false, on: false },
+  { id: 'PCU481112481112',    label: "Int'l Scheduled Air",  short: "Int'l Air",            color: '#4527A0', thick: false, on: false },
+  { id: 'PCU482111482111',    label: 'Intermodal Rail',      short: 'Intermodal',           color: '#5D4037', thick: false, on: false },
 ];
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmt(key) {
+function fmtDate(key) {
   const [y, m] = key.split('-');
-  return `${MONTHS[+m - 1]} '${y.slice(2)}`;
+  return `${MONTHS[+m-1]} '${y.slice(2)}`;
 }
 
-let chart   = null;
-let visible = [true, false, true, true, true, false, false, false];
+// ── Chart renderer ────────────────────────────────────────────────
+const PAD = { top: 20, right: 20, bottom: 80, left: 58 };
+let hoverIdx = -1;
 
+function getCanvas() { return document.getElementById('priceChart'); }
+
+function resize() {
+  const canvas = getCanvas();
+  const wrap = document.getElementById('chartWrap');
+  const W = wrap.clientWidth - 16;
+  const H = Math.round(W * 0.52);
+  canvas.width  = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  draw();
+}
+
+function getScale() {
+  let mn = Infinity, mx = -Infinity;
+  SERIES.forEach(s => {
+    if (!s.on) return;
+    const vals = EMBEDDED.series[s.id] || [];
+    vals.forEach(v => { if (v != null) { mn = Math.min(mn, v); mx = Math.max(mx, v); } });
+  });
+  if (!isFinite(mn)) { mn = 0.9; mx = 1.1; }
+  const pad = (mx - mn) * 0.08 || 0.02;
+  mn -= pad; mx += pad;
+  // nice tick step
+  const range = mx - mn;
+  const rawStep = range / 6;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const step = Math.ceil(rawStep / mag) * mag;
+  const lo = Math.floor(mn / step) * step;
+  const hi = Math.ceil(mx / step) * step;
+  return { min: lo, max: hi, step };
+}
+
+function toCanvasXY(canvas, i, v, scale) {
+  const W = canvas.width / devicePixelRatio;
+  const H = canvas.height / devicePixelRatio;
+  const n = EMBEDDED.dates.length;
+  const x = PAD.left + (i / (n - 1)) * (W - PAD.left - PAD.right);
+  const y = PAD.top  + (1 - (v - scale.min) / (scale.max - scale.min)) * (H - PAD.top - PAD.bottom);
+  return [x, y];
+}
+
+function draw() {
+  const canvas = getCanvas();
+  const ctx = canvas.getContext('2d');
+  const dpr = devicePixelRatio;
+  const W = canvas.width / dpr;
+  const H = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const scale = getScale();
+  const n = EMBEDDED.dates.length;
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top  - PAD.bottom;
+
+  // Grid + Y-axis ticks
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.fillStyle = '#999';
+  ctx.strokeStyle = '#f0f0f0';
+  ctx.lineWidth = 1;
+
+  let t = scale.min;
+  while (t <= scale.max + 1e-9) {
+    const y = PAD.top + (1 - (t - scale.min) / (scale.max - scale.min)) * plotH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y);
+    ctx.stroke();
+    ctx.fillText(t.toFixed(3), PAD.left - 6, y);
+    t = Math.round((t + scale.step) * 1e6) / 1e6;
+  }
+
+  // Y-axis label
+  ctx.save();
+  ctx.translate(13, PAD.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.fillStyle = '#aaa';
+  ctx.fillText('Index (rebased to 1.000)', 0, 0);
+  ctx.restore();
+
+  // X-axis labels
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.font = '9px system-ui, sans-serif';
+  ctx.fillStyle = '#999';
+  const step = Math.ceil(n / 24);
+  for (let i = 0; i < n; i += step) {
+    const x = PAD.left + (i / (n - 1)) * plotW;
+    ctx.save();
+    ctx.translate(x, H - PAD.bottom + 6);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(fmtDate(EMBEDDED.dates[i]), 0, 0);
+    ctx.restore();
+  }
+  // Always draw last label
+  {
+    const x = PAD.left + plotW;
+    ctx.save();
+    ctx.translate(x, H - PAD.bottom + 6);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(fmtDate(EMBEDDED.dates[n - 1]), 0, 0);
+    ctx.restore();
+  }
+
+  // Hover crosshair
+  if (hoverIdx >= 0) {
+    const x = PAD.left + (hoverIdx / (n - 1)) * plotW;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, H - PAD.bottom);
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Series lines
+  SERIES.forEach(s => {
+    if (!s.on) return;
+    const vals = EMBEDDED.series[s.id] || [];
+    ctx.beginPath();
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.thick ? 3 : 1.8;
+    ctx.lineJoin = 'round';
+    let pen = false;
+    let prevX = null, prevY = null;
+    for (let i = 0; i < n; i++) {
+      const v = vals[i];
+      if (v == null) { pen = false; continue; }
+      const [x, y] = toCanvasXY(canvas, i, v, scale);
+      if (!pen) { ctx.moveTo(x, y); pen = true; }
+      else       { ctx.lineTo(x, y); }
+      prevX = x; prevY = y;
+    }
+    ctx.stroke();
+
+    // Hover dot
+    if (hoverIdx >= 0 && vals[hoverIdx] != null) {
+      const [x, y] = toCanvasXY(canvas, hoverIdx, vals[hoverIdx], scale);
+      ctx.beginPath();
+      ctx.arc(x, y, s.thick ? 5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = s.color; ctx.fill();
+      ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  });
+
+  // Axes border
+  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+  ctx.strokeRect(PAD.left, PAD.top, plotW, plotH);
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────
+function updateTooltip(e) {
+  const canvas = getCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const n = EMBEDDED.dates.length;
+  const plotW = canvas.clientWidth - PAD.left - PAD.right;
+  const frac  = (mx - PAD.left) / plotW;
+  const idx   = Math.round(frac * (n - 1));
+
+  if (idx < 0 || idx >= n) {
+    hoverIdx = -1;
+    document.getElementById('tooltip').style.display = 'none';
+    draw(); return;
+  }
+
+  hoverIdx = idx;
+  draw();
+
+  const tt = document.getElementById('tooltip');
+  const title = document.getElementById('tt-title');
+  const body  = document.getElementById('tt-body');
+  title.textContent = fmtDate(EMBEDDED.dates[idx]);
+  let html = '';
+  SERIES.forEach(s => {
+    if (!s.on) return;
+    const v = (EMBEDDED.series[s.id] || [])[idx];
+    if (v == null) return;
+    html += `<div class="tt-row"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${s.color};margin-right:5px;vertical-align:middle"></span>${s.short}: <b>${v.toFixed(4)}</b></div>`;
+  });
+  body.innerHTML = html;
+
+  // Position tooltip
+  const wrap = document.getElementById('chartWrap');
+  const wRect = wrap.getBoundingClientRect();
+  const canvasX = PAD.left + (idx / (n - 1)) * plotW;
+  let left = canvasX + 16;
+  if (left + 230 > canvas.clientWidth) left = canvasX - 230;
+  tt.style.left = left + 'px';
+  tt.style.top  = (PAD.top + 10) + 'px';
+  tt.style.display = 'block';
+}
+
+// ── Toggles ───────────────────────────────────────────────────────
 function renderToggles() {
   const el = document.getElementById('toggles');
   el.innerHTML = '';
   SERIES.forEach((s, i) => {
-    const on = visible[i];
-    const c  = document.createElement('div');
-    c.className = `chip ${on ? 'on' : 'off'}`;
-    if (on) { c.style.backgroundColor = s.color; c.style.borderColor = s.color; }
-    c.innerHTML = `<span class="chip-dot" style="background:${on ? 'rgba(255,255,255,0.8)' : s.color}"></span>${s.short}`;
+    const c = document.createElement('div');
+    c.className = `chip ${s.on ? 'on' : 'off'}`;
+    if (s.on) { c.style.backgroundColor = s.color; c.style.borderColor = s.color; }
+    c.innerHTML = `<span class="chip-dot" style="background:${s.on ? 'rgba(255,255,255,0.8)' : s.color}"></span>${s.short}`;
     c.title = s.label;
-    c.onclick = () => {
-      visible[i] = !visible[i];
-      if (chart) { chart.data.datasets[i].hidden = !visible[i]; chart.update('none'); }
-      renderToggles();
-    };
+    c.onclick = () => { s.on = !s.on; renderToggles(); draw(); };
     el.appendChild(c);
   });
 }
 
-function renderChart(processed) {
-  const ctx = document.getElementById('priceChart').getContext('2d');
-  if (chart) { chart.destroy(); chart = null; }
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels:   processed.dates.map(fmt),
-      datasets: SERIES.map((s, i) => ({
-        label:                     s.label,
-        data:                      processed.series[s.id] ?? processed.dates.map(() => null),
-        borderColor:               s.color,
-        backgroundColor:           s.color + '12',
-        borderWidth:               s.thick ? 5.5 : 2.2,
-        pointRadius:               0,
-        pointHoverRadius:          5,
-        pointHoverBackgroundColor: s.color,
-        pointHoverBorderColor:     'white',
-        pointHoverBorderWidth:     2,
-        tension:                   0.15,
-        hidden:                    !visible[i],
-        spanGaps:                  true,
-      })),
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          borderColor: '#e0e0e0', borderWidth: 1,
-          titleColor: '#222', bodyColor: '#444', padding: 11,
-          callbacks: {
-            label: ctx => ctx.parsed.y != null
-              ? `  ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`
-              : null,
-          },
-        },
-      },
-      scales: {
-        x: {
-          grid: { color: '#f2f2f2' },
-          ticks: { autoSkip: false, maxRotation: 90, minRotation: 90, font: { size: 9 }, color: '#999' },
-        },
-        y: {
-          grid: { color: '#f2f2f2' },
-          ticks: { callback: v => v.toFixed(3), font: { size: 10.5 }, color: '#999' },
-          title: { display: true, text: 'Index (rebased to 1.000 at start of window)', font: { size: 11 }, color: '#888' },
-        },
-      },
-    },
-  });
-}
-
+// ── Download ──────────────────────────────────────────────────────
 function downloadChart() {
-  if (!chart) return;
-  const url = chart.toBase64Image('image/jpeg', 0.95);
+  const canvas = getCanvas();
+  const url = canvas.toDataURL('image/jpeg', 0.95);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'freight-price-index.jpg';
-  a.click();
+  a.href = url; a.download = 'freight-price-index.jpg'; a.click();
 }
 
+// ── Init ──────────────────────────────────────────────────────────
 function main() {
   renderToggles();
-  if (EMBEDDED && EMBEDDED.dates && EMBEDDED.series) {
-    document.getElementById('overlay').style.display = 'none';
-    renderChart(EMBEDDED);
-    document.getElementById('statusRange').textContent =
-      `${EMBEDDED.dates[0]} → ${EMBEDDED.dates[EMBEDDED.dates.length - 1]}`;
-    document.getElementById('statusFetch').textContent =
-      `Updated ${EMBEDDED.updatedAt.slice(0, 10)}`;
-  }
+  resize();
+  document.getElementById('statusRange').textContent =
+    `${EMBEDDED.dates[0]} → ${EMBEDDED.dates[EMBEDDED.dates.length - 1]}`;
+  document.getElementById('statusFetch').textContent =
+    `Updated ${EMBEDDED.updatedAt.slice(0, 10)}`;
+
+  const canvas = getCanvas();
+  canvas.addEventListener('mousemove', updateTooltip);
+  canvas.addEventListener('mouseleave', () => {
+    hoverIdx = -1;
+    document.getElementById('tooltip').style.display = 'none';
+    draw();
+  });
+  window.addEventListener('resize', resize);
 }
 
 document.addEventListener('DOMContentLoaded', main);
